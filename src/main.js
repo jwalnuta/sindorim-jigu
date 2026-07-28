@@ -1,4 +1,7 @@
 import './style.css'
+import district1GeoJsonRaw from './data/district-1.geojson?raw'
+
+const district1GeoJson = JSON.parse(district1GeoJsonRaw)
 
 document.querySelector('#app').innerHTML = `
   <main class="page">
@@ -75,6 +78,45 @@ document.querySelector('#app').innerHTML = `
           <p>지도를 보려면 자바스크립트를 사용해 주세요.</p>
         </div>
       </noscript>
+      ${
+        import.meta.env.DEV
+          ? `
+            <aside class="boundary-tool" aria-labelledby="boundary-tool-heading">
+              <div class="boundary-tool__heading">
+                <div>
+                  <p class="eyebrow">개발 전용 도구</p>
+                  <h3 id="boundary-tool-heading">1지구 경계 입력</h3>
+                </div>
+                <span class="boundary-tool__badge">개발 환경</span>
+              </div>
+              <p class="boundary-tool__guide" id="boundary-guide">
+                경계 그리기 버튼을 누른 뒤 지도에서 꼭짓점을 차례대로 선택하세요.
+              </p>
+              <div class="boundary-tool__actions">
+                <button type="button" class="boundary-button boundary-button--primary" id="boundary-start">
+                  1지구 경계 그리기
+                </button>
+                <button type="button" class="boundary-button" id="boundary-undo">
+                  마지막 점 취소
+                </button>
+                <button type="button" class="boundary-button" id="boundary-reset">
+                  전체 초기화
+                </button>
+                <button type="button" class="boundary-button boundary-button--complete" id="boundary-complete">
+                  경계 완성
+                </button>
+              </div>
+              <div class="geojson-result" id="geojson-result" hidden>
+                <div class="geojson-result__heading">
+                  <h4>완성된 GeoJSON 좌표</h4>
+                  <button type="button" class="boundary-button" id="boundary-copy">좌표 복사</button>
+                </div>
+                <pre id="geojson-output"></pre>
+              </div>
+            </aside>
+          `
+          : ''
+      }
     </section>
   </main>
 `
@@ -92,6 +134,25 @@ let marker
 let geocoder
 let places
 let searchSequence = 0
+let boundaryCoordinates = []
+let boundaryMarkers = []
+let boundaryPolyline
+let boundaryPolygon
+let boundaryDrawingActive = false
+let boundaryComplete = false
+
+const boundaryTool = import.meta.env.DEV
+  ? {
+      startButton: document.querySelector('#boundary-start'),
+      undoButton: document.querySelector('#boundary-undo'),
+      resetButton: document.querySelector('#boundary-reset'),
+      completeButton: document.querySelector('#boundary-complete'),
+      copyButton: document.querySelector('#boundary-copy'),
+      guide: document.querySelector('#boundary-guide'),
+      result: document.querySelector('#geojson-result'),
+      output: document.querySelector('#geojson-output'),
+    }
+  : null
 
 function setResultMessage(message, details = []) {
   const content = document.createDocumentFragment()
@@ -127,9 +188,61 @@ function findFirstValidResult(results) {
   })
 }
 
+function isPointOnSegment(point, start, end) {
+  const [pointX, pointY] = point
+  const [startX, startY] = start
+  const [endX, endY] = end
+  const crossProduct =
+    (pointY - startY) * (endX - startX) - (pointX - startX) * (endY - startY)
+
+  if (Math.abs(crossProduct) > 1e-10) return false
+
+  return (
+    pointX >= Math.min(startX, endX) - 1e-10 &&
+    pointX <= Math.max(startX, endX) + 1e-10 &&
+    pointY >= Math.min(startY, endY) - 1e-10 &&
+    pointY <= Math.max(startY, endY) + 1e-10
+  )
+}
+
+function isPointInPolygon(point, polygon) {
+  let isInside = false
+
+  for (let current = 0, previous = polygon.length - 1; current < polygon.length; previous = current++) {
+    const currentPoint = polygon[current]
+    const previousPoint = polygon[previous]
+
+    if (isPointOnSegment(point, previousPoint, currentPoint)) return true
+
+    const crossesLatitude =
+      currentPoint[1] > point[1] !== previousPoint[1] > point[1]
+    const intersectionLongitude =
+      ((previousPoint[0] - currentPoint[0]) * (point[1] - currentPoint[1])) /
+        (previousPoint[1] - currentPoint[1]) +
+      currentPoint[0]
+
+    if (crossesLatitude && point[0] < intersectionLongitude) {
+      isInside = !isInside
+    }
+  }
+
+  return isInside
+}
+
+function getDistrictName(longitude, latitude) {
+  const districtBoundary = district1GeoJson.geometry.coordinates[0]
+
+  return isPointInPolygon([longitude, latitude], districtBoundary)
+    ? district1GeoJson.properties.name
+    : '아직 등록되지 않은 지구'
+}
+
 function showSearchResult(result, type) {
   const kakao = window.kakao
-  const position = new kakao.maps.LatLng(Number(result.y), Number(result.x))
+  const latitude = Number(result.y)
+  const longitude = Number(result.x)
+  const position = new kakao.maps.LatLng(latitude, longitude)
+  const districtName = getDistrictName(longitude, latitude)
 
   map.setCenter(position)
   marker.setPosition(position)
@@ -146,7 +259,7 @@ function showSearchResult(result, type) {
         label: '지번 주소',
         value: roadAddress && lotAddress !== roadAddress ? lotAddress : '',
       },
-      { label: '지구 안내', value: '지구 경계 데이터 연결 준비 중' },
+      { label: '지구 안내', value: districtName },
     ])
     return
   }
@@ -164,7 +277,7 @@ function showSearchResult(result, type) {
           ? result.address_name
           : '',
     },
-    { label: '지구 안내', value: '지구 경계 데이터 연결 준비 중' },
+    { label: '지구 안내', value: districtName },
   ])
 }
 
@@ -244,6 +357,181 @@ searchForm.addEventListener('submit', (event) => {
   searchLocation(query)
 })
 
+function setBoundaryGuide(message) {
+  if (boundaryTool) boundaryTool.guide.textContent = message
+}
+
+function updateBoundaryPreview() {
+  if (!boundaryTool) return
+
+  boundaryPolyline?.setPath(boundaryCoordinates)
+  boundaryPolygon?.setPath(boundaryCoordinates.length >= 3 ? boundaryCoordinates : [])
+  boundaryTool.undoButton.disabled = boundaryCoordinates.length === 0
+  boundaryTool.resetButton.disabled = boundaryCoordinates.length === 0
+  boundaryTool.completeButton.disabled = boundaryCoordinates.length < 3
+}
+
+function addBoundaryVertex(position) {
+  const vertex = document.createElement('span')
+  vertex.className = 'boundary-vertex-marker'
+  vertex.setAttribute('aria-hidden', 'true')
+
+  const overlay = new window.kakao.maps.CustomOverlay({
+    map,
+    position,
+    content: vertex,
+    xAnchor: 0.5,
+    yAnchor: 0.5,
+    zIndex: 4,
+  })
+
+  boundaryMarkers.push(overlay)
+}
+
+function createBoundaryGeoJson() {
+  const coordinates = boundaryCoordinates.map((position) => [
+    position.getLng(),
+    position.getLat(),
+  ])
+
+  coordinates.push([...coordinates[0]])
+
+  return {
+    type: 'Feature',
+    properties: {
+      district: 1,
+      name: '1지구',
+    },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [coordinates],
+    },
+  }
+}
+
+function handleBoundaryMapClick(mouseEvent) {
+  if (!boundaryTool || !boundaryDrawingActive || boundaryComplete) return
+
+  boundaryCoordinates.push(mouseEvent.latLng)
+  addBoundaryVertex(mouseEvent.latLng)
+  updateBoundaryPreview()
+  setBoundaryGuide(
+    `${boundaryCoordinates.length}개의 꼭짓점을 추가했습니다. 계속 지도를 클릭하거나 경계를 완성하세요.`,
+  )
+}
+
+function setupBoundaryTool(kakao) {
+  if (!boundaryTool) return
+
+  boundaryPolyline = new kakao.maps.Polyline({
+    map,
+    path: [],
+    strokeWeight: 3,
+    strokeColor: '#38bdf8',
+    strokeOpacity: 0.95,
+    strokeStyle: 'solid',
+  })
+
+  boundaryPolygon = new kakao.maps.Polygon({
+    map,
+    path: [],
+    strokeWeight: 3,
+    strokeColor: '#38bdf8',
+    strokeOpacity: 0.95,
+    fillColor: '#7dd3fc',
+    fillOpacity: 0.28,
+  })
+
+  kakao.maps.event.addListener(map, 'click', handleBoundaryMapClick)
+  updateBoundaryPreview()
+
+  boundaryTool.startButton.addEventListener('click', () => {
+    if (boundaryComplete) {
+      setBoundaryGuide('새 경계를 그리려면 먼저 전체 초기화를 눌러 주세요.')
+      return
+    }
+
+    boundaryDrawingActive = true
+    boundaryTool.startButton.classList.add('is-active')
+    boundaryTool.startButton.textContent = '지도에서 꼭짓점 선택 중'
+    setBoundaryGuide('지도에서 1지구 경계의 꼭짓점을 차례대로 선택하세요.')
+  })
+
+  boundaryTool.undoButton.addEventListener('click', () => {
+    if (boundaryCoordinates.length === 0) return
+
+    boundaryComplete = false
+    boundaryDrawingActive = true
+    boundaryCoordinates.pop()
+    boundaryMarkers.pop()?.setMap(null)
+    boundaryTool.result.hidden = true
+    boundaryTool.startButton.classList.add('is-active')
+    boundaryTool.startButton.textContent = '지도에서 꼭짓점 선택 중'
+    updateBoundaryPreview()
+    setBoundaryGuide(`마지막 점을 취소했습니다. 현재 꼭짓점은 ${boundaryCoordinates.length}개입니다.`)
+  })
+
+  boundaryTool.resetButton.addEventListener('click', () => {
+    boundaryMarkers.forEach((overlay) => overlay.setMap(null))
+    boundaryMarkers = []
+    boundaryCoordinates = []
+    boundaryDrawingActive = false
+    boundaryComplete = false
+    boundaryTool.result.hidden = true
+    boundaryTool.output.textContent = ''
+    boundaryTool.startButton.classList.remove('is-active')
+    boundaryTool.startButton.textContent = '1지구 경계 그리기'
+    updateBoundaryPreview()
+    setBoundaryGuide('초기화했습니다. 경계 그리기 버튼을 눌러 다시 시작하세요.')
+  })
+
+  boundaryTool.completeButton.addEventListener('click', () => {
+    if (boundaryCoordinates.length < 3) {
+      setBoundaryGuide('경계를 완성하려면 꼭짓점이 3개 이상 필요합니다.')
+      return
+    }
+
+    boundaryDrawingActive = false
+    boundaryComplete = true
+    boundaryTool.startButton.classList.remove('is-active')
+    boundaryTool.startButton.textContent = '1지구 경계 그리기'
+    boundaryPolyline.setPath([])
+    boundaryPolygon.setPath(boundaryCoordinates)
+    boundaryTool.output.textContent = JSON.stringify(createBoundaryGeoJson(), null, 2)
+    boundaryTool.result.hidden = false
+    setBoundaryGuide('1지구 경계를 완성했습니다. 아래에서 GeoJSON 좌표를 확인하세요.')
+  })
+
+  boundaryTool.copyButton.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(boundaryTool.output.textContent)
+      boundaryTool.copyButton.textContent = '복사 완료'
+      window.setTimeout(() => {
+        boundaryTool.copyButton.textContent = '좌표 복사'
+      }, 1600)
+    } catch {
+      setBoundaryGuide('좌표를 복사하지 못했습니다. 직접 선택해 복사해 주세요.')
+    }
+  })
+}
+
+function displayDistrictBoundary(kakao) {
+  const boundaryPath = district1GeoJson.geometry.coordinates[0].map(
+    ([longitude, latitude]) => new kakao.maps.LatLng(latitude, longitude),
+  )
+
+  new kakao.maps.Polygon({
+    map,
+    path: boundaryPath,
+    strokeWeight: 3,
+    strokeColor: '#38bdf8',
+    strokeOpacity: 0.95,
+    strokeStyle: 'solid',
+    fillColor: '#7dd3fc',
+    fillOpacity: 0.28,
+  })
+}
+
 function showMapError(message) {
   mapContainer.classList.add('map-container--error')
   mapStatus.innerHTML = `
@@ -275,6 +563,8 @@ function createKakaoMap() {
       })
       geocoder = new kakao.maps.services.Geocoder()
       places = new kakao.maps.services.Places()
+      displayDistrictBoundary(kakao)
+      setupBoundaryTool(kakao)
 
       mapStatus.remove()
     } catch {

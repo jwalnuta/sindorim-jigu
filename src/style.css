@@ -340,6 +340,136 @@ h1 {
   color: #9b4545;
 }
 
+.boundary-tool {
+  margin-top: 22px;
+  padding: 22px;
+  border: 1px solid #cfe2d6;
+  border-radius: 18px;
+  background: #f7fbf8;
+}
+
+.boundary-tool__heading,
+.geojson-result__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.boundary-tool__heading h3,
+.geojson-result__heading h4 {
+  margin: 0;
+  color: var(--green-900);
+  letter-spacing: -0.02em;
+}
+
+.boundary-tool__heading h3 {
+  font-size: 1.12rem;
+}
+
+.boundary-tool__heading .eyebrow {
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+}
+
+.boundary-tool__badge {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  color: var(--green-700);
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--green-100);
+}
+
+.boundary-tool__guide {
+  margin: 14px 0 16px;
+  color: var(--gray-600);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.boundary-tool__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.boundary-button {
+  min-height: 40px;
+  padding: 8px 14px;
+  color: var(--green-900);
+  font-weight: 700;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  background: var(--white);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.boundary-button:hover:not(:disabled) {
+  border-color: var(--green-600);
+  background: var(--green-50);
+}
+
+.boundary-button:focus-visible {
+  outline: 3px solid rgba(47, 125, 88, 0.25);
+  outline-offset: 2px;
+}
+
+.boundary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.boundary-button--primary,
+.boundary-button--primary.is-active,
+.boundary-button--complete {
+  color: var(--white);
+  border-color: var(--green-700);
+  background: var(--green-700);
+}
+
+.boundary-button--primary.is-active {
+  border-color: #0284c7;
+  background: #0284c7;
+}
+
+.boundary-vertex-marker {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  background: #0ea5e9;
+  box-shadow: 0 1px 5px rgba(3, 105, 161, 0.55);
+}
+
+.geojson-result {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #dce8e0;
+}
+
+.geojson-result[hidden] {
+  display: none;
+}
+
+.geojson-result__heading h4 {
+  font-size: 0.96rem;
+}
+
+.geojson-result pre {
+  max-height: 300px;
+  margin: 12px 0 0;
+  padding: 16px;
+  overflow: auto;
+  color: #d9fbe6;
+  font: 0.78rem/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre;
+  border-radius: 12px;
+  background: #163326;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -411,6 +541,27 @@ h1 {
   .map-container,
   .map-fallback {
     min-height: 330px;
+  }
+
+  .boundary-tool {
+    padding: 18px;
+  }
+
+  .boundary-tool__heading {
+    align-items: flex-start;
+  }
+
+  .boundary-tool__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .boundary-button--primary {
+    grid-column: 1 / -1;
+  }
+
+  .geojson-result__heading {
+    align-items: flex-start;
   }
 }
 
