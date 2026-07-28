@@ -36,6 +36,8 @@ jobs:
 
       - name: 프로젝트 빌드
         run: npm run build
+        env:
+          VITE_KAKAO_JAVASCRIPT_KEY: ${{ secrets.VITE_KAKAO_JAVASCRIPT_KEY }}
 
       - name: 배포 파일 업로드
         uses: actions/upload-pages-artifact@v3
