@@ -237,6 +237,51 @@ function getDistrictName(longitude, latitude) {
     : '아직 등록되지 않은 지구'
 }
 
+function getPolygonCenter(polygon) {
+  const [originX, originY] = polygon[0]
+  let signedArea = 0
+  let centerX = 0
+  let centerY = 0
+
+  for (let index = 0; index < polygon.length - 1; index += 1) {
+    const currentX = polygon[index][0] - originX
+    const currentY = polygon[index][1] - originY
+    const nextX = polygon[index + 1][0] - originX
+    const nextY = polygon[index + 1][1] - originY
+    const crossProduct = currentX * nextY - nextX * currentY
+
+    signedArea += crossProduct
+    centerX += (currentX + nextX) * crossProduct
+    centerY += (currentY + nextY) * crossProduct
+  }
+
+  signedArea *= 0.5
+
+  if (Math.abs(signedArea) < Number.EPSILON) {
+    return polygon[0]
+  }
+
+  const center = [
+    originX + centerX / (6 * signedArea),
+    originY + centerY / (6 * signedArea),
+  ]
+
+  if (isPointInPolygon(center, polygon)) {
+    return center
+  }
+
+  const boundsCenter = [
+    (Math.min(...polygon.map(([longitude]) => longitude)) +
+      Math.max(...polygon.map(([longitude]) => longitude))) /
+      2,
+    (Math.min(...polygon.map(([, latitude]) => latitude)) +
+      Math.max(...polygon.map(([, latitude]) => latitude))) /
+      2,
+  ]
+
+  return isPointInPolygon(boundsCenter, polygon) ? boundsCenter : polygon[0]
+}
+
 function showSearchResult(result, type) {
   const kakao = window.kakao
   const latitude = Number(result.y)
@@ -516,7 +561,8 @@ function setupBoundaryTool(kakao) {
 }
 
 function displayDistrictBoundary(kakao) {
-  const boundaryPath = district1GeoJson.geometry.coordinates[0].map(
+  const districtBoundary = district1GeoJson.geometry.coordinates[0]
+  const boundaryPath = districtBoundary.map(
     ([longitude, latitude]) => new kakao.maps.LatLng(latitude, longitude),
   )
 
@@ -529,6 +575,20 @@ function displayDistrictBoundary(kakao) {
     strokeStyle: 'solid',
     fillColor: '#7dd3fc',
     fillOpacity: 0.28,
+  })
+
+  const [labelLongitude, labelLatitude] = getPolygonCenter(districtBoundary)
+  const label = document.createElement('div')
+  label.className = 'district-map-label'
+  label.textContent = district1GeoJson.properties.name
+
+  new kakao.maps.CustomOverlay({
+    map,
+    position: new kakao.maps.LatLng(labelLatitude, labelLongitude),
+    content: label,
+    xAnchor: 0.5,
+    yAnchor: 0.5,
+    zIndex: 3,
   })
 }
 
