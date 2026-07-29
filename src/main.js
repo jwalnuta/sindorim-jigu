@@ -117,7 +117,7 @@ document.querySelector('#app').innerHTML = `
               <div class="boundary-tool__heading">
                 <div>
                   <p class="eyebrow">개발 전용 도구</p>
-                  <h3 id="boundary-tool-heading">4지구 경계 입력</h3>
+                  <h3 id="boundary-tool-heading">13지구 경계 입력</h3>
                 </div>
                 <span class="boundary-tool__badge">개발 환경</span>
               </div>
@@ -126,7 +126,7 @@ document.querySelector('#app').innerHTML = `
               </p>
               <div class="boundary-tool__actions">
                 <button type="button" class="boundary-button boundary-button--primary" id="boundary-start">
-                  4지구 경계 그리기
+                  13지구 경계 그리기
                 </button>
                 <button type="button" class="boundary-button" id="boundary-undo">
                   마지막 점 취소
@@ -504,8 +504,8 @@ function createBoundaryGeoJson() {
   return {
     type: 'Feature',
     properties: {
-      district: 4,
-      name: '4지구',
+      district: 13,
+      name: '13지구',
     },
     geometry: {
       type: 'Polygon',
@@ -559,7 +559,7 @@ function setupBoundaryTool(kakao) {
     boundaryDrawingActive = true
     boundaryTool.startButton.classList.add('is-active')
     boundaryTool.startButton.textContent = '지도에서 꼭짓점 선택 중'
-    setBoundaryGuide('지도에서 4지구 경계의 꼭짓점을 차례대로 선택하세요.')
+    setBoundaryGuide('지도에서 13지구 경계의 꼭짓점을 차례대로 선택하세요.')
   })
 
   boundaryTool.undoButton.addEventListener('click', () => {
@@ -585,7 +585,7 @@ function setupBoundaryTool(kakao) {
     boundaryTool.result.hidden = true
     boundaryTool.output.textContent = ''
     boundaryTool.startButton.classList.remove('is-active')
-    boundaryTool.startButton.textContent = '4지구 경계 그리기'
+    boundaryTool.startButton.textContent = '13지구 경계 그리기'
     updateBoundaryPreview()
     setBoundaryGuide('초기화했습니다. 경계 그리기 버튼을 눌러 다시 시작하세요.')
   })
@@ -599,12 +599,12 @@ function setupBoundaryTool(kakao) {
     boundaryDrawingActive = false
     boundaryComplete = true
     boundaryTool.startButton.classList.remove('is-active')
-    boundaryTool.startButton.textContent = '4지구 경계 그리기'
+    boundaryTool.startButton.textContent = '13지구 경계 그리기'
     boundaryPolyline.setPath([])
     boundaryPolygon.setPath(boundaryCoordinates)
     boundaryTool.output.textContent = JSON.stringify(createBoundaryGeoJson(), null, 2)
     boundaryTool.result.hidden = false
-    setBoundaryGuide('4지구 경계를 완성했습니다. 아래에서 GeoJSON 좌표를 확인하세요.')
+    setBoundaryGuide('13지구 경계를 완성했습니다. 아래에서 GeoJSON 좌표를 확인하세요.')
   })
 
   boundaryTool.copyButton.addEventListener('click', async () => {
