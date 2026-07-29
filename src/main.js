@@ -2,6 +2,7 @@ import './style.css'
 import district1GeoJsonRaw from './data/district-1.geojson?raw'
 import district2GeoJsonRaw from './data/district-2.geojson?raw'
 import district3GeoJsonRaw from './data/district-3.geojson?raw'
+import district5GeoJsonRaw from './data/district-5.geojson?raw'
 import district6GeoJsonRaw from './data/district-6.geojson?raw'
 import district7GeoJsonRaw from './data/district-7.geojson?raw'
 import district8GeoJsonRaw from './data/district-8.geojson?raw'
@@ -17,6 +18,7 @@ import district17GeoJsonRaw from './data/district-17.geojson?raw'
 const district1GeoJson = JSON.parse(district1GeoJsonRaw)
 const district2GeoJson = JSON.parse(district2GeoJsonRaw)
 const district3GeoJson = JSON.parse(district3GeoJsonRaw)
+const district5GeoJson = JSON.parse(district5GeoJsonRaw)
 const district6GeoJson = JSON.parse(district6GeoJsonRaw)
 const district7GeoJson = JSON.parse(district7GeoJsonRaw)
 const district8GeoJson = JSON.parse(district8GeoJsonRaw)
@@ -111,7 +113,7 @@ document.querySelector('#app').innerHTML = `
               <div class="boundary-tool__heading">
                 <div>
                   <p class="eyebrow">개발 전용 도구</p>
-                  <h3 id="boundary-tool-heading">11지구 경계 입력</h3>
+                  <h3 id="boundary-tool-heading">5지구 경계 입력</h3>
                 </div>
                 <span class="boundary-tool__badge">개발 환경</span>
               </div>
@@ -120,7 +122,7 @@ document.querySelector('#app').innerHTML = `
               </p>
               <div class="boundary-tool__actions">
                 <button type="button" class="boundary-button boundary-button--primary" id="boundary-start">
-                  11지구 경계 그리기
+                  5지구 경계 그리기
                 </button>
                 <button type="button" class="boundary-button" id="boundary-undo">
                   마지막 점 취소
@@ -261,6 +263,7 @@ function getDistrictName(longitude, latitude) {
     district1GeoJson,
     district2GeoJson,
     district3GeoJson,
+    district5GeoJson,
     district6GeoJson,
     district7GeoJson,
     district8GeoJson,
@@ -495,8 +498,8 @@ function createBoundaryGeoJson() {
   return {
     type: 'Feature',
     properties: {
-      district: 11,
-      name: '11지구',
+      district: 5,
+      name: '5지구',
     },
     geometry: {
       type: 'Polygon',
@@ -550,7 +553,7 @@ function setupBoundaryTool(kakao) {
     boundaryDrawingActive = true
     boundaryTool.startButton.classList.add('is-active')
     boundaryTool.startButton.textContent = '지도에서 꼭짓점 선택 중'
-    setBoundaryGuide('지도에서 11지구 경계의 꼭짓점을 차례대로 선택하세요.')
+    setBoundaryGuide('지도에서 5지구 경계의 꼭짓점을 차례대로 선택하세요.')
   })
 
   boundaryTool.undoButton.addEventListener('click', () => {
@@ -576,7 +579,7 @@ function setupBoundaryTool(kakao) {
     boundaryTool.result.hidden = true
     boundaryTool.output.textContent = ''
     boundaryTool.startButton.classList.remove('is-active')
-    boundaryTool.startButton.textContent = '11지구 경계 그리기'
+    boundaryTool.startButton.textContent = '5지구 경계 그리기'
     updateBoundaryPreview()
     setBoundaryGuide('초기화했습니다. 경계 그리기 버튼을 눌러 다시 시작하세요.')
   })
@@ -590,12 +593,12 @@ function setupBoundaryTool(kakao) {
     boundaryDrawingActive = false
     boundaryComplete = true
     boundaryTool.startButton.classList.remove('is-active')
-    boundaryTool.startButton.textContent = '11지구 경계 그리기'
+    boundaryTool.startButton.textContent = '5지구 경계 그리기'
     boundaryPolyline.setPath([])
     boundaryPolygon.setPath(boundaryCoordinates)
     boundaryTool.output.textContent = JSON.stringify(createBoundaryGeoJson(), null, 2)
     boundaryTool.result.hidden = false
-    setBoundaryGuide('11지구 경계를 완성했습니다. 아래에서 GeoJSON 좌표를 확인하세요.')
+    setBoundaryGuide('5지구 경계를 완성했습니다. 아래에서 GeoJSON 좌표를 확인하세요.')
   })
 
   boundaryTool.copyButton.addEventListener('click', async () => {
@@ -696,6 +699,38 @@ function displayDistrict3Boundary(kakao) {
   const label = document.createElement('div')
   label.className = 'district-map-label'
   label.textContent = district3GeoJson.properties.name
+
+  new kakao.maps.CustomOverlay({
+    map,
+    position: new kakao.maps.LatLng(labelLatitude, labelLongitude),
+    content: label,
+    xAnchor: 0.5,
+    yAnchor: 0.5,
+    zIndex: 3,
+  })
+}
+
+function displayDistrict5Boundary(kakao) {
+  const districtBoundary = district5GeoJson.geometry.coordinates[0]
+  const boundaryPath = districtBoundary.map(
+    ([longitude, latitude]) => new kakao.maps.LatLng(latitude, longitude),
+  )
+
+  new kakao.maps.Polygon({
+    map,
+    path: boundaryPath,
+    strokeWeight: 3,
+    strokeColor: '#000000',
+    strokeOpacity: 0.95,
+    strokeStyle: 'solid',
+    fillColor: '#d1d5db',
+    fillOpacity: 0.28,
+  })
+
+  const [labelLongitude, labelLatitude] = getPolygonCenter(districtBoundary)
+  const label = document.createElement('div')
+  label.className = 'district-map-label'
+  label.textContent = district5GeoJson.properties.name
 
   new kakao.maps.CustomOverlay({
     map,
@@ -1093,6 +1128,7 @@ function createKakaoMap() {
       displayDistrictBoundary(kakao)
       displayDistrict2Boundary(kakao)
       displayDistrict3Boundary(kakao)
+      displayDistrict5Boundary(kakao)
       displayDistrict6Boundary(kakao)
       displayDistrict7Boundary(kakao)
       displayDistrict8Boundary(kakao)
