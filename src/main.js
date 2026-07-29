@@ -1,7 +1,9 @@
 import './style.css'
 import district1GeoJsonRaw from './data/district-1.geojson?raw'
+import district2GeoJsonRaw from './data/district-2.geojson?raw'
 
 const district1GeoJson = JSON.parse(district1GeoJsonRaw)
+const district2GeoJson = JSON.parse(district2GeoJsonRaw)
 
 document.querySelector('#app').innerHTML = `
   <main class="page">
@@ -85,7 +87,7 @@ document.querySelector('#app').innerHTML = `
               <div class="boundary-tool__heading">
                 <div>
                   <p class="eyebrow">개발 전용 도구</p>
-                  <h3 id="boundary-tool-heading">1지구 경계 입력</h3>
+                  <h3 id="boundary-tool-heading">2지구 경계 입력</h3>
                 </div>
                 <span class="boundary-tool__badge">개발 환경</span>
               </div>
@@ -94,7 +96,7 @@ document.querySelector('#app').innerHTML = `
               </p>
               <div class="boundary-tool__actions">
                 <button type="button" class="boundary-button boundary-button--primary" id="boundary-start">
-                  1지구 경계 그리기
+                  2지구 경계 그리기
                 </button>
                 <button type="button" class="boundary-button" id="boundary-undo">
                   마지막 점 취소
@@ -230,11 +232,25 @@ function isPointInPolygon(point, polygon) {
 }
 
 function getDistrictName(longitude, latitude) {
-  const districtBoundary = district1GeoJson.geometry.coordinates[0]
+  const point = [longitude, latitude]
+  const district1Boundary = district1GeoJson.geometry.coordinates[0]
+  const district2Boundary = district2GeoJson.geometry.coordinates[0]
+  const isInDistrict1 = isPointInPolygon(point, district1Boundary)
+  const isInDistrict2 = isPointInPolygon(point, district2Boundary)
 
-  return isPointInPolygon([longitude, latitude], districtBoundary)
-    ? district1GeoJson.properties.name
-    : '아직 등록되지 않은 지구'
+  if (isInDistrict1 && isInDistrict2) {
+    return '1지구와 2지구 경계가 겹치는 위치'
+  }
+
+  if (isInDistrict1) {
+    return district1GeoJson.properties.name
+  }
+
+  if (isInDistrict2) {
+    return district2GeoJson.properties.name
+  }
+
+  return '아직 등록되지 않은 지구'
 }
 
 function getPolygonCenter(polygon) {
@@ -444,8 +460,8 @@ function createBoundaryGeoJson() {
   return {
     type: 'Feature',
     properties: {
-      district: 1,
-      name: '1지구',
+      district: 2,
+      name: '2지구',
     },
     geometry: {
       type: 'Polygon',
@@ -499,7 +515,7 @@ function setupBoundaryTool(kakao) {
     boundaryDrawingActive = true
     boundaryTool.startButton.classList.add('is-active')
     boundaryTool.startButton.textContent = '지도에서 꼭짓점 선택 중'
-    setBoundaryGuide('지도에서 1지구 경계의 꼭짓점을 차례대로 선택하세요.')
+    setBoundaryGuide('지도에서 2지구 경계의 꼭짓점을 차례대로 선택하세요.')
   })
 
   boundaryTool.undoButton.addEventListener('click', () => {
@@ -525,7 +541,7 @@ function setupBoundaryTool(kakao) {
     boundaryTool.result.hidden = true
     boundaryTool.output.textContent = ''
     boundaryTool.startButton.classList.remove('is-active')
-    boundaryTool.startButton.textContent = '1지구 경계 그리기'
+    boundaryTool.startButton.textContent = '2지구 경계 그리기'
     updateBoundaryPreview()
     setBoundaryGuide('초기화했습니다. 경계 그리기 버튼을 눌러 다시 시작하세요.')
   })
@@ -539,12 +555,12 @@ function setupBoundaryTool(kakao) {
     boundaryDrawingActive = false
     boundaryComplete = true
     boundaryTool.startButton.classList.remove('is-active')
-    boundaryTool.startButton.textContent = '1지구 경계 그리기'
+    boundaryTool.startButton.textContent = '2지구 경계 그리기'
     boundaryPolyline.setPath([])
     boundaryPolygon.setPath(boundaryCoordinates)
     boundaryTool.output.textContent = JSON.stringify(createBoundaryGeoJson(), null, 2)
     boundaryTool.result.hidden = false
-    setBoundaryGuide('1지구 경계를 완성했습니다. 아래에서 GeoJSON 좌표를 확인하세요.')
+    setBoundaryGuide('2지구 경계를 완성했습니다. 아래에서 GeoJSON 좌표를 확인하세요.')
   })
 
   boundaryTool.copyButton.addEventListener('click', async () => {
@@ -592,6 +608,38 @@ function displayDistrictBoundary(kakao) {
   })
 }
 
+function displayDistrict2Boundary(kakao) {
+  const districtBoundary = district2GeoJson.geometry.coordinates[0]
+  const boundaryPath = districtBoundary.map(
+    ([longitude, latitude]) => new kakao.maps.LatLng(latitude, longitude),
+  )
+
+  new kakao.maps.Polygon({
+    map,
+    path: boundaryPath,
+    strokeWeight: 3,
+    strokeColor: '#f97316',
+    strokeOpacity: 0.95,
+    strokeStyle: 'solid',
+    fillColor: '#fdba74',
+    fillOpacity: 0.28,
+  })
+
+  const [labelLongitude, labelLatitude] = getPolygonCenter(districtBoundary)
+  const label = document.createElement('div')
+  label.className = 'district-map-label'
+  label.textContent = district2GeoJson.properties.name
+
+  new kakao.maps.CustomOverlay({
+    map,
+    position: new kakao.maps.LatLng(labelLatitude, labelLongitude),
+    content: label,
+    xAnchor: 0.5,
+    yAnchor: 0.5,
+    zIndex: 3,
+  })
+}
+
 function showMapError(message) {
   mapContainer.classList.add('map-container--error')
   mapStatus.innerHTML = `
@@ -624,6 +672,7 @@ function createKakaoMap() {
       geocoder = new kakao.maps.services.Geocoder()
       places = new kakao.maps.services.Places()
       displayDistrictBoundary(kakao)
+      displayDistrict2Boundary(kakao)
       setupBoundaryTool(kakao)
 
       mapStatus.remove()
